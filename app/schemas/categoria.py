@@ -1,0 +1,15 @@
+from pydantic import BaseModel
+
+
+
+class CategoriaBase(BaseModel):
+    nombre: str
+
+class CategoriaCreate(CategoriaBase):
+    pass
+
+class CategoriaResponse(CategoriaBase):
+    id:int
+    
+    class Config:
+        from_attributes = True #de sql alchemy a json
