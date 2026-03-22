@@ -1008,3 +1008,7 @@ Se usa como dependencia para endpoints que solo admins pueden ejecutar.
 ---
 
 > 🚧 *Este README se actualizará a medida que avance el proyecto.*
+
+
+MIGRACIONES, EVITAR PERDER DATOS AL AGREGAR UNA NUEVA COLUMNA, USAREMOS, alembic init alembic Contiene los scripts de migracion
+alembic revision --autogenerate -m "crear tablas iniciales" HACE EL CAMBIO
