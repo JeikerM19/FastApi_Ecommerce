@@ -1012,3 +1012,7 @@ Se usa como dependencia para endpoints que solo admins pueden ejecutar.
 
 MIGRACIONES, EVITAR PERDER DATOS AL AGREGAR UNA NUEVA COLUMNA, USAREMOS, alembic init alembic Contiene los scripts de migracion
 alembic revision --autogenerate -m "crear tablas iniciales" HACE EL CAMBIO
+
+Mas entidades, el modelo del pedido, se tendra un carrito, donde el usuario podra confirmar la compra, el carrito puede cambiar muchas veces pero el pedido es permanente
+
+Si la base de dato tiene migraciones pendientes etnonces se usa upgrade head

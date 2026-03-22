@@ -1,6 +1,6 @@
 from logging.config import fileConfig
 
-from models import Usuario, Producto, Categoria
+from models import Usuario, Producto, Categoria, Pedido, DetallePedido, Carrito, ItemCarrito
 from db.database import Base, engine
 from core.config import settings
 
