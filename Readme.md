@@ -240,22 +240,33 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 ### Cómo se cargan las variables
 
-Usamos `python-dotenv` para leer el archivo `.env` automáticamente:
+Usamos `pydantic-settings` para centralizar la carga del archivo `.env`. Creamos un archivo `app/core/config.py`:
 
 ```python
-import os
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
+from pathlib import Path
 
-load_dotenv()  # Lee el archivo .env
+class Settings(BaseSettings):
+    DATABASE_URL: str
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-SECRET_KEY = os.getenv("SECRET_KEY")
+    class Config:
+        # Busca el .env en la raíz del proyecto
+        env_file = Path(__file__).resolve().parent.parent.parent / ".env"
+
+# Instancia global para usar en el resto de la app
+settings = Settings()
 ```
 
-| Función               | ¿Qué hace?                                                        |
-|-----------------------|--------------------------------------------------------------------|
-| `load_dotenv()`       | Lee el archivo `.env` y carga las variables al entorno del sistema |
-| `os.getenv("CLAVE")` | Obtiene el valor de una variable de entorno                        |
+Ahora en cualquier archivo (como `database.py` o `security.py`), simplemente importamos `settings`:
+
+```python
+from core.config import settings
+
+print(settings.DATABASE_URL)
+```
 
 > ⚠️ **Importante:** Asegúrate de agregar `.env` a tu `.gitignore` para que **nunca** se suba al repositorio. Las credenciales expuestas son un riesgo de seguridad grave.
 
@@ -332,7 +343,8 @@ FASTAPI/
     │       ├── productos.py       # Endpoints de productos
     │       └── categorias.py      # Endpoints de categorías
     ├── core/
-    │   └── security.py            # Hashing de contraseñas + JWT (crear/verificar tokens)
+    │   ├── config.py              # Carga centralizada de variables de entorno (BaseSettings)
+    │   └── security.py            # Hashing de contraseñas + JWT
     ├── crud/
     │   ├── __init__.py            # Re-exporta todas las funciones CRUD
     │   ├── producto.py            # CRUD de productos
@@ -387,15 +399,12 @@ Un **ORM** (Object-Relational Mapping) permite interactuar con la base de datos 
 ### Conexión a la BD (`db/database.py`)
 
 ```python
-import os
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from core.config import settings
 
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = settings.DATABASE_URL
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -404,8 +413,7 @@ Base = declarative_base()
 
 | Componente               | ¿Qué hace?                                                              |
 |--------------------------|--------------------------------------------------------------------------|
-| `load_dotenv()`          | Carga las variables del archivo `.env`                                   |
-| `os.getenv("DATABASE_URL")` | Lee la URL de conexión desde las variables de entorno                |
+| `settings.DATABASE_URL`  | Lee la URL de conexión desde `config.py`                                 |
 | `create_engine(URL)`     | Crea el motor de conexión: puente entre Python y la BD                   |
 | `declarative_base()`     | Genera la clase base de la que heredan todos los modelos                 |
 | `sessionmaker(...)`      | Fábrica de sesiones: cada sesión es una "conversación" con la BD         |
@@ -809,16 +817,13 @@ def verify_password(password: str, hashed: str):
 ### Tokens JWT
 
 ```python
-import os
-from dotenv import load_dotenv
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
+from core.config import settings
 
-load_dotenv()
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 def crear_token(sub: str, es_admin: bool):
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
