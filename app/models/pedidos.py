@@ -7,7 +7,8 @@ class Carrito(Base):
     __tablename__="carritos"
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
-    usuario = relationship("Usuario", back_populates="carrito", cascade="all, delete")
+    usuario = relationship("Usuario", back_populates="carrito")
+    items = relationship("ItemCarrito", back_populates="carrito", cascade="all, delete-orphan")
 
 class ItemCarrito(Base):
     __tablename__ = "items_carrito"
@@ -25,6 +26,7 @@ class Pedido(Base):
     fecha = Column(DateTime, default=datetime.now)
     total = Column(Float)
     detalles = relationship("DetallePedido", back_populates="pedido")
+    usuario = relationship("Usuario", back_populates="pedidos")
 
 class DetallePedido(Base):
     __tablename__ = "detalles_pedidos"
@@ -33,4 +35,4 @@ class DetallePedido(Base):
     producto_id = Column(Integer, ForeignKey("productos.id"))
     cantidad = Column(Integer)
     subtotal =Column(Float)
-    pedido = relationship("Producto")
+    pedido = relationship("Pedido", back_populates="detalles")

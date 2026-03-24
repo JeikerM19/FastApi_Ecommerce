@@ -8,5 +8,6 @@ class Producto(Base):
     nombre = Column(String(100), index=True)
     precio = Column(Float)
     en_stock = Column(Boolean, default=True)
+    stock = Column(Integer, default=0)
     categoria_id = Column(Integer, ForeignKey("categorias.id"))
     categorias = relationship("Categoria", back_populates="productos")

@@ -1,6 +1,8 @@
-# 🚀 Curso de Backend con FastAPI
+# 🚀 Curso de Backend con FastAPI — E-Commerce API
 
-Apuntes y proyecto práctico del curso de **Backend con Python y FastAPI**. Este repositorio documenta los conceptos fundamentales para construir APIs RESTful modernas, con un proyecto de e-commerce como referencia.
+Apuntes y proyecto práctico del curso de **Backend con Python y FastAPI**. Este repositorio documenta los conceptos fundamentales para construir APIs RESTful modernas, con un proyecto de e-commerce real como referencia.
+
+El proyecto ha evolucionado desde una API básica hasta un sistema completo con autenticación JWT, carrito de compras, sistema de pedidos, control de stock y migraciones de base de datos con Alembic.
 
 ---
 
@@ -13,11 +15,15 @@ Apuntes y proyecto práctico del curso de **Backend con Python y FastAPI**. Este
 - [Estructura del Proyecto](#-estructura-del-proyecto)
 - [Base de Datos con SQLAlchemy](#-base-de-datos-con-sqlalchemy)
 - [Modelos ORM](#-modelos-orm)
+- [Relaciones entre Modelos](#-relaciones-entre-modelos)
 - [Schemas Pydantic](#-schemas-pydantic)
 - [Operaciones CRUD](#-operaciones-crud)
 - [Seguridad y Autenticación](#-seguridad-y-autenticación)
 - [Sistema de Rutas con APIRouter](#-sistema-de-rutas-con-apirouter)
 - [Dependencias](#-dependencias)
+- [Migraciones con Alembic](#-migraciones-con-alembic)
+- [Sistema de Carrito de Compras](#-sistema-de-carrito-de-compras)
+- [Sistema de Pedidos](#-sistema-de-pedidos)
 - [Endpoints de la API](#-endpoints-de-la-api)
 - [Recursos Útiles](#-recursos-útiles)
 
@@ -114,7 +120,7 @@ Cada respuesta del servidor incluye un **código numérico** que indica qué pas
 #### Los 4 métodos HTTP principales (CRUD)
 
 | Método     | Operación | Descripción                   | ¿Lleva Body? |
-|-----------|-----------|-------------------------------|--------------|
+|-----------|-----------|-------------------------------|--------------| 
 | **GET**    | Read      | Obtener recursos              | No           |
 | **POST**   | Create    | Crear un nuevo recurso        | Sí           |
 | **PUT**    | Update    | Actualizar un recurso existente | Sí         |
@@ -124,22 +130,17 @@ Cada respuesta del servidor incluye un **código numérico** que indica qué pas
 
 ### ¿Qué es JSON?
 
-**JSON** (JavaScript Object Notation) es el **formato estándar** para intercambiar datos en APIs web. Es texto plano que tanto humanos como máquinas pueden leer fácilmente.
+**JSON** (JavaScript Object Notation) es el **formato estándar** para intercambiar datos en APIs web.
 
 ```json
 {
     "nombre": "Laptop Gaming",
     "precio": 1299.99,
     "en_stock": true,
-    "categorias": ["electrónica", "computadoras"],
-    "detalles": {
-        "marca": "ASUS",
-        "ram": "16GB"
-    }
+    "stock": 15,
+    "categorias": ["electrónica", "computadoras"]
 }
 ```
-
-#### Tipos de datos en JSON
 
 | Tipo        | Ejemplo                          | Equivalente Python |
 |-------------|----------------------------------|--------------------|
@@ -149,22 +150,6 @@ Cada respuesta del servidor incluye un **código numérico** que indica qué pas
 | **Array**   | `["a", "b", "c"]`              | `list`             |
 | **Object**  | `{"clave": "valor"}`            | `dict`             |
 | **Null**    | `null`                          | `None`             |
-
-> 📝 JSON es el formato que FastAPI usa por defecto para recibir datos (`Request Body`) y enviar respuestas. Cuando defines un schema Pydantic, FastAPI convierte automáticamente entre JSON y objetos Python.
-
-### ¿Cómo se conecta todo?
-
-```
-                    Protocolo HTTP
-Cliente ─────────────────────────────────────► Servidor (FastAPI)
-        ◄─────────────────────────────────────
-        
-El cliente envía:                 El servidor responde:
-  • Método HTTP (GET, POST...)     • Código de estado (200, 404...)
-  • URL del recurso                • Headers de respuesta
-  • Headers (Auth, Content-Type)   • Body en formato JSON
-  • Body en formato JSON (si aplica)
-```
 
 ---
 
@@ -179,8 +164,7 @@ python -m venv venv
 **Windows (PowerShell):**
 
 ```powershell
-cd venv\Scripts
-.\activate
+.\venv\Scripts\Activate.ps1
 ```
 
 > 💡 Sabrás que el entorno está activo cuando veas `(venv)` al inicio de tu terminal.
@@ -188,7 +172,7 @@ cd venv\Scripts
 ### 2. Instalar dependencias
 
 ```bash
-pip install fastapi uvicorn sqlalchemy pymysql passlib[bcrypt] python-jose[cryptography] python-multipart email-validator python-dotenv
+pip install fastapi uvicorn sqlalchemy pymysql passlib[bcrypt] python-jose[cryptography] python-multipart email-validator python-dotenv alembic pydantic-settings
 ```
 
 | Paquete                        | Descripción                                                                |
@@ -202,18 +186,16 @@ pip install fastapi uvicorn sqlalchemy pymysql passlib[bcrypt] python-jose[crypt
 | **python-multipart**           | Necesario para recibir datos de formularios (login con `OAuth2PasswordRequestForm`) |
 | **email-validator**            | Validación automática de emails en schemas con `EmailStr`                  |
 | **python-dotenv**              | Carga variables de entorno desde un archivo `.env`                         |
+| **alembic**                    | Herramienta de migraciones de base de datos para SQLAlchemy                |
+| **pydantic-settings**          | Carga centralizada de configuración desde `.env` con validación Pydantic   |
 
 ### 3. Ejecutar el servidor
 
 ```bash
+# Desde la carpeta app/
+cd app
 uvicorn main:app --reload
 ```
-
-| Parte      | Significado                                                   |
-|------------|---------------------------------------------------------------|
-| `main`     | Nombre del archivo Python (`main.py`)                         |
-| `app`      | Nombre de la instancia de FastAPI dentro del archivo          |
-| `--reload` | Reinicia el servidor al detectar cambios en el código         |
 
 - **API:** http://127.0.0.1:8000
 - **Documentación Swagger:** http://127.0.0.1:8000/docs
@@ -222,7 +204,7 @@ uvicorn main:app --reload
 
 ## 🔒 Variables de Entorno
 
-Las credenciales sensibles (contraseñas de BD, claves secretas) **nunca** deben estar en el código fuente. Se guardan en un archivo `.env` que no se sube al repositorio.
+Las credenciales sensibles **nunca** deben estar en el código fuente. Se guardan en un archivo `.env` que **no se sube al repositorio** (está en `.gitignore`).
 
 ### Archivo `.env`
 
@@ -238,9 +220,7 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
-### Cómo se cargan las variables
-
-Usamos `pydantic-settings` para centralizar la carga del archivo `.env`. Creamos un archivo `app/core/config.py`:
+### Cómo se cargan las variables (`core/config.py`)
 
 ```python
 from pydantic_settings import BaseSettings
@@ -253,24 +233,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     class Config:
-        # Busca el .env en la raíz del proyecto
         env_file = Path(__file__).resolve().parent.parent.parent / ".env"
 
-# Instancia global para usar en el resto de la app
 settings = Settings()
 ```
 
-Ahora en cualquier archivo (como `database.py` o `security.py`), simplemente importamos `settings`:
-
-```python
-from core.config import settings
-
-print(settings.DATABASE_URL)
-```
-
-> ⚠️ **Importante:** Asegúrate de agregar `.env` a tu `.gitignore` para que **nunca** se suba al repositorio. Las credenciales expuestas son un riesgo de seguridad grave.
-
-### Formato de la URL de conexión
+### Formato de la URL de conexión MySQL
 
 ```
 mysql+pymysql://usuario:contraseña@localhost:3306/nombre_bd
@@ -286,10 +254,6 @@ mysql+pymysql://usuario:contraseña@localhost:3306/nombre_bd
 ---
 
 ## ⚡ Conceptos Básicos de FastAPI
-
-### ¿Qué es FastAPI?
-
-Framework web moderno para Python que utiliza **type hints** para validación automática y generación de documentación. Incluye Swagger UI integrado.
 
 ### Instancia y endpoints
 
@@ -322,9 +286,6 @@ def list_items(skip: int = 0, limit: int = 10):
 # Uso: GET /items/?skip=0&limit=5
 ```
 
-- FastAPI hace **validación automática** de tipos.
-- Parámetros con **valor por defecto** son opcionales; sin default, son obligatorios.
-
 ---
 
 ## 📁 Estructura del Proyecto
@@ -332,45 +293,50 @@ def list_items(skip: int = 0, limit: int = 10):
 ```
 FASTAPI/
 ├── .env                           # Variables de entorno (NO se sube a git)
-├── .gitignore                     # Archivos ignorados por git
-├── Readme.md                      # Documentación del proyecto
+├── .gitignore
+├── Readme.md
 └── app/
-    ├── main.py                    # Punto de entrada de la aplicación
+    ├── main.py                    # Punto de entrada: registra el api_router con prefix /api/v1
+    ├── alembic/                   # Migraciones de base de datos
+    │   ├── env.py                 # Configuración de Alembic (conecta con la BD y los modelos)
+    │   └── versions/              # Scripts de migración autogenerados
     ├── api/
     │   └── api_v1/
     │       ├── api.py             # Router principal (agrupa todos los sub-routers)
-    │       ├── auth.py            # Endpoints de autenticación y usuarios
+    │       ├── auth.py            # Endpoints de registro y login
     │       ├── productos.py       # Endpoints de productos
-    │       └── categorias.py      # Endpoints de categorías
+    │       ├── categorias.py      # Endpoints de categorías
+    │       ├── carrito.py         # Endpoints del carrito de compras
+    │       └── pedido.py          # Endpoint de confirmación de pedido
     ├── core/
-    │   ├── config.py              # Carga centralizada de variables de entorno (BaseSettings)
-    │   └── security.py            # Hashing de contraseñas + JWT
+    │   ├── config.py              # Carga centralizada de variables de entorno
+    │   └── security.py            # Hashing de contraseñas + generación/verificación de JWT
     ├── crud/
     │   ├── __init__.py            # Re-exporta todas las funciones CRUD
     │   ├── producto.py            # CRUD de productos
     │   ├── categoria.py           # CRUD de categorías
-    │   └── usuario.py             # CRUD de usuarios
+    │   ├── usuario.py             # CRUD de usuarios
+    │   ├── carrito.py             # Lógica del carrito (obtener, agregar, eliminar items)
+    │   └── pedido.py              # Lógica para confirmar un pedido desde el carrito
     ├── db/
-    │   ├── database.py            # Configuración de conexión a la BD
-    │   └── init_db.py             # Script para crear las tablas
+    │   └── database.py            # Configuración del motor y sesión de SQLAlchemy
     ├── deps/
-    │   └── deps.py                # Dependencias (get_db, autenticación, permisos)
+    │   └── deps.py                # Dependencias: get_db, get_current_user, requiere_admin
     ├── models/
-    │   ├── __init__.py            # Re-exporta todos los modelos
-    │   ├── producto.py            # Modelo ORM de Producto
-    │   ├── categoria.py           # Modelo ORM de Categoría
-    │   └── usuario.py             # Modelo ORM de Usuario
+    │   ├── __init__.py
+    │   ├── producto.py            # Modelo ORM: Producto
+    │   ├── categoria.py           # Modelo ORM: Categoria
+    │   ├── usuario.py             # Modelo ORM: Usuario
+    │   └── pedidos.py             # Modelos ORM: Carrito, ItemCarrito, Pedido, DetallePedido
     └── schemas/
-        ├── __init__.py            # Re-exporta todos los schemas
-        ├── producto.py            # Schemas de Producto
-        ├── categoria.py           # Schemas de Categoría
-        ├── usuario.py             # Schemas de Usuario
-        └── token.py               # Schema de Token JWT
+        ├── __init__.py
+        ├── producto.py
+        ├── categoria.py
+        ├── usuario.py
+        └── token.py
 ```
 
 ### Principio de separación de responsabilidades
-
-Cada carpeta tiene una función específica:
 
 | Carpeta      | Responsabilidad                                          |
 |-------------|----------------------------------------------------------|
@@ -392,7 +358,7 @@ Un **ORM** (Object-Relational Mapping) permite interactuar con la base de datos 
 
 | Sin ORM (SQL puro)                         | Con ORM (SQLAlchemy)                   |
 |--------------------------------------------|----------------------------------------|
-| `SELECT * FROM productos WHERE id = 1`     | `db.query(Producto).get(1)`            |
+| `SELECT * FROM productos WHERE id = 1`     | `db.get(Producto, 1)`                  |
 | Errores detectados solo en ejecución       | Errores detectados por el IDE y Python |
 | Atado a un motor de BD específico          | Puedes cambiar de motor fácilmente     |
 
@@ -404,16 +370,13 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from core.config import settings
 
-DATABASE_URL = settings.DATABASE_URL
-
-engine = create_engine(DATABASE_URL)
+engine = create_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 ```
 
 | Componente               | ¿Qué hace?                                                              |
 |--------------------------|--------------------------------------------------------------------------|
-| `settings.DATABASE_URL`  | Lee la URL de conexión desde `config.py`                                 |
 | `create_engine(URL)`     | Crea el motor de conexión: puente entre Python y la BD                   |
 | `declarative_base()`     | Genera la clase base de la que heredan todos los modelos                 |
 | `sessionmaker(...)`      | Fábrica de sesiones: cada sesión es una "conversación" con la BD         |
@@ -422,80 +385,101 @@ Base = declarative_base()
 |---------------------------|---------|----------------------------------------------------------------|
 | `autocommit`              | `False` | Tú decides cuándo hacer `commit()`, dándote control total      |
 | `autoflush`               | `False` | No envía cambios pendientes antes de cada consulta             |
-| `bind`                    | `engine`| Conecta la sesión al motor de BD                               |
 
-### Creación de tablas (`db/init_db.py`)
+### Operaciones de sesión
 
-```python
-from db.database import engine, Base
-from models import *  # Importa todos los modelos para que Base los registre
-
-Base.metadata.create_all(bind=engine)
-print("Tablas creadas correctamente")
-```
-
-> 📝 `create_all` solo crea tablas que **no existen**. No modifica tablas existentes. Para migraciones, se usa **Alembic**.
+| Método            | ¿Qué hace?                                              |
+|-------------------|---------------------------------------------------------|
+| `db.add(obj)`     | Marca el objeto para ser insertado (aún no va a la BD)  |
+| `db.commit()`     | Ejecuta el INSERT/UPDATE/DELETE real en la BD            |
+| `db.refresh(obj)` | Recarga el objeto desde la BD (útil para obtener el `id` autogenerado) |
+| `db.delete(obj)`  | Marca el objeto para eliminarse en el próximo commit     |
 
 ---
 
 ## 📊 Modelos ORM
 
-Los modelos son **clases Python que representan tablas** en la base de datos. Cada atributo corresponde a una columna. Viven en `models/`.
+Los modelos son **clases Python que representan tablas** en la base de datos. Cada atributo corresponde a una columna.
 
-### Modelo Producto (`models/producto.py`)
+### Modelo Producto
 
 ```python
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
-from db.database import Base
-
 class Producto(Base):
     __tablename__ = "productos"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(100), index=True)
     precio = Column(Float)
-    en_stock = Column(Boolean, default=True)
+    en_stock = Column(Boolean, default=True)   # ¿Está disponible para venta?
+    stock = Column(Integer, default=0)         # Cantidad disponible en inventario
     categoria_id = Column(Integer, ForeignKey("categorias.id"))
     categorias = relationship("Categoria", back_populates="productos")
 ```
 
-### Modelo Categoría (`models/categoria.py`)
+> ⚠️ **Importante:** `en_stock` (Boolean) y `stock` (Integer) son campos distintos. `en_stock` indica si el producto está activo/disponible para venta (se puede desactivar manualmente un producto). `stock` indica cuántas unidades físicas quedan en inventario y se descuenta automáticamente al confirmar un pedido.
+
+### Modelo Usuario
 
 ```python
-from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import relationship
-from db.database import Base
-
-class Categoria(Base):
-    __tablename__ = "categorias"
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(100), unique=True, index=True)
-    productos = relationship("Producto", back_populates="categorias")
-```
-
-### Modelo Usuario (`models/usuario.py`)
-
-```python
-from sqlalchemy import Column, Integer, String, Boolean
-from db.database import Base
-
 class Usuario(Base):
     __tablename__ = "usuarios"
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(100), unique=True, index=True)
     email = Column(String(100), unique=True, index=True)
-    hashed_password = Column(String(100))       # Contraseña hasheada, nunca texto plano
-    es_admin = Column(Boolean, default=False)   # Rol del usuario
+    hashed_password = Column(String(100))
+    es_admin = Column(Boolean, default=False)
+    carrito = relationship("Carrito", back_populates="usuario", uselist=False, cascade="all, delete-orphan")
+    pedidos = relationship("Pedido", back_populates="usuario", cascade="all, delete-orphan")
 ```
 
-### Referencia rápida de columnas SQLAlchemy
+> 💡 `uselist=False` en `carrito` indica que la relación devuelve **un solo objeto** (no una lista), porque un usuario solo tiene un carrito activo a la vez.
+
+### Modelos de Pedidos (`models/pedidos.py`)
+
+```python
+class Carrito(Base):
+    __tablename__ = "carritos"
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    usuario = relationship("Usuario", back_populates="carrito")
+    items = relationship("ItemCarrito", back_populates="carrito", cascade="all, delete-orphan")
+
+class ItemCarrito(Base):
+    __tablename__ = "items_carrito"
+    id = Column(Integer, primary_key=True, index=True)
+    carrito_id = Column(Integer, ForeignKey("carritos.id"))
+    producto_id = Column(Integer, ForeignKey("productos.id"))
+    cantidad = Column(Integer, default=1)
+    carrito = relationship("Carrito", back_populates="items")
+    producto = relationship("Producto")
+
+class Pedido(Base):
+    __tablename__ = "pedidos"
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    fecha = Column(DateTime, default=datetime.now)
+    total = Column(Float)
+    detalles = relationship("DetallePedido", back_populates="pedido")
+    usuario = relationship("Usuario", back_populates="pedidos")
+
+class DetallePedido(Base):
+    __tablename__ = "detalles_pedidos"
+    id = Column(Integer, primary_key=True, index=True)
+    pedido_id = Column(Integer, ForeignKey("pedidos.id"))
+    producto_id = Column(Integer, ForeignKey("productos.id"))
+    cantidad = Column(Integer)
+    subtotal = Column(Float)
+    pedido = relationship("Pedido", back_populates="detalles")
+```
+
+### Referencia rápida de columnas
 
 | Tipo SQLAlchemy | SQL equivalente | Ejemplo de uso                    |
 |-----------------|-----------------|-----------------------------------|
-| `Integer`       | `INT`           | IDs, cantidades                   |
+| `Integer`       | `INT`           | IDs, cantidades, stock            |
 | `String(n)`     | `VARCHAR(n)`    | Nombres, emails                   |
-| `Float`         | `FLOAT`         | Precios                           |
-| `Boolean`       | `BOOLEAN`       | Flags como `en_stock`, `es_admin` |
+| `Float`         | `FLOAT`         | Precios, totales                  |
+| `Boolean`       | `TINYINT(1)`    | Flags como `en_stock`, `es_admin` |
+| `DateTime`      | `DATETIME`      | Fechas de pedidos                 |
 
 | Parámetro de `Column`          | Descripción                                                 |
 |-------------------------------|-------------------------------------------------------------|
@@ -505,59 +489,55 @@ class Usuario(Base):
 | `default=valor`               | Valor por defecto si no se especifica                       |
 | `ForeignKey("tabla.columna")` | Clave foránea: vincula con otra tabla                       |
 
-### Relaciones entre tablas
+---
 
-Una categoría tiene **muchos** productos, y cada producto pertenece a **una** categoría (relación uno-a-muchos):
+## 🔗 Relaciones entre Modelos
+
+El proyecto implementa varias relaciones uno-a-muchos usando `relationship` y `back_populates`. Entender cómo funcionan es crítico para evitar errores.
+
+### Diagrama de la base de datos
 
 ```
-┌──────────────┐          ┌──────────────────┐
-│  Categorías  │          │    Productos     │
-├──────────────┤          ├──────────────────┤
-│ id (PK)      │◄────────┐│ id (PK)          │
-│ nombre       │         ││ nombre           │
-│              │         ││ precio           │
-│              │         ││ en_stock         │
-│              │         └│ categoria_id (FK)│
-└──────────────┘          └──────────────────┘
-     1                           Muchos
+usuarios ──────────── carritos ──────────── items_carrito ──── productos
+    │                                                               │
+    └───────────────── pedidos ──────────── detalles_pedidos ──────┘
+                          │
+                      categorias
 ```
 
-Se construye en 2 pasos:
+### Reglas del `cascade`
 
-1. **Clave foránea** en el modelo del lado "muchos":
-   ```python
-   categoria_id = Column(Integer, ForeignKey("categorias.id"))
-   ```
-
-2. **Relación bidireccional** con `relationship` en ambos modelos:
-   ```python
-   # En Producto:
-   categorias = relationship("Categoria", back_populates="productos")
-   # En Categoria:
-   productos = relationship("Producto", back_populates="categorias")
-   ```
-
-> 💡 `back_populates` permite navegar en ambas direcciones: `producto.categorias` y `categoria.productos`.
-
-### Re-exportación con `__init__.py`
-
-`models/__init__.py` re-exporta todos los modelos para importarlos fácilmente:
+El parámetro `cascade` determina qué pasa con los registros hijos cuando se borra el padre:
 
 ```python
-from .producto import Producto
-from .categoria import Categoria
-from .usuario import Usuario
+# ✅ CORRECTO: el cascade siempre va del PADRE al HIJO
+# Si borro un usuario, se borran su carrito y sus pedidos
+carrito = relationship("Carrito", cascade="all, delete-orphan")
+pedidos = relationship("Pedido", cascade="all, delete-orphan")
+
+# ❌ INCORRECTO: el carrito NO debe borrar al usuario (su padre)
+usuario = relationship("Usuario", cascade="all, delete")  # ← esto borra al usuario al borrar el carrito
 ```
 
-Esto permite hacer `from models import Producto` desde cualquier parte del proyecto.
+> ⚠️ Un error muy común es agregar `cascade` en la dirección equivocada. En la relación `Carrito → Usuario`, el carrito es el hijo y **nunca debe tener un cascade que afecte al padre**.
+
+### `back_populates` vs `backref`
+
+Ambos crean la relación bidireccional, pero `back_populates` es más explícito y es la forma recomendada en SQLAlchemy moderno:
+
+```python
+# En Usuario:
+carrito = relationship("Carrito", back_populates="usuario")
+
+# En Carrito (debe coincidir con el nombre en Usuario):
+usuario = relationship("Usuario", back_populates="carrito")
+```
 
 ---
 
 ## 📝 Schemas Pydantic
 
 ### ¿Por qué necesito Schemas si ya tengo Models?
-
-Hacen **trabajos completamente diferentes**:
 
 | Aspecto          | Modelo SQLAlchemy (`models/`)        | Schema Pydantic (`schemas/`)        |
 |------------------|--------------------------------------|-------------------------------------|
@@ -567,85 +547,25 @@ Hacen **trabajos completamente diferentes**:
 
 > 🔑 **Analogía:** El **modelo** es la cocina (cómo se almacenan los datos). El **schema** es el menú (qué puede pedir/recibir el cliente).
 
-### Schemas de Producto (`schemas/producto.py`)
+### Schemas típicos por entidad
 
 ```python
-from pydantic import BaseModel
-
-class ProductoCreate(BaseModel):
+class ProductoCreate(BaseModel):    # Para POST: lo que envía el cliente
     nombre: str
     precio: float
     en_stock: bool
+    stock: int
     categoria_id: int
 
-class ProductoResponse(ProductoCreate):
+class ProductoResponse(ProductoCreate):  # Para GET: lo que devuelve la API
     id: int
     class Config:
-        from_attributes = True  # Permite leer datos de objetos SQLAlchemy
+        from_attributes = True  # Permite leer atributos de objetos SQLAlchemy
 ```
 
-### Schemas de Categoría (`schemas/categoria.py`)
+### `orm_mode` / `from_attributes`
 
-```python
-from pydantic import BaseModel
-
-class CategoriaBase(BaseModel):
-    nombre: str
-
-class CategoriaCreate(CategoriaBase):
-    pass
-
-class CategoriaResponse(CategoriaBase):
-    id: int
-    class Config:
-        orm_mode = True
-```
-
-### Schemas de Usuario (`schemas/usuario.py`)
-
-```python
-from pydantic import BaseModel, EmailStr
-
-class UsuarioBase(BaseModel):
-    nombre: str
-    email: EmailStr              # Valida que sea un email real
-
-class UsuarioCreate(UsuarioBase):
-    password: str                # Texto plano (se hashea en el backend)
-    es_admin: bool = False
-
-class UsuarioResponse(UsuarioBase):
-    id: int
-    es_admin: bool
-    class Config:
-        from_attributes = True
-    # ⚠️ NO incluye password ni hashed_password — nunca se devuelven
-```
-
-### Schema de Token (`schemas/token.py`)
-
-```python
-from pydantic import BaseModel
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-```
-
-### ¿Por qué varios schemas por entidad?
-
-Cada operación necesita datos diferentes:
-
-```
-CREATE (POST):  El usuario envía nombre, precio, etc. (NO envía id)
-READ (GET):     La API devuelve id + nombre + precio, etc. (SÍ incluye id)
-```
-
-Por eso existen schemas separados: `XxxCreate` (entrada) y `XxxResponse` (salida).
-
-### `orm_mode` / `from_attributes` — ¿Qué es?
-
-SQLAlchemy devuelve **objetos** (con `.nombre`, `.precio`), no diccionarios. Pydantic por defecto lee diccionarios. Esta configuración le dice a Pydantic que lea **atributos** del objeto:
+SQLAlchemy devuelve **objetos** Python (con `.nombre`, `.precio`), no diccionarios. Pydantic por defecto solo lee diccionarios. Esta configuración lo soluciona:
 
 ```python
 class Config:
@@ -653,17 +573,15 @@ class Config:
     # orm_mode = True       # Pydantic v1
 ```
 
-> 📝 **Regla:** Todo schema que devuelva datos de la BD necesita `orm_mode = True` o `from_attributes = True`.
+> 📝 **Regla:** Todo schema que devuelva datos de la BD necesita `from_attributes = True`.
 
 ### `response_model` — Filtrando las respuestas
-
-En los endpoints, `response_model` controla qué campos se devuelven:
 
 ```python
 @router.post("/usuarios", response_model=schemas.UsuarioResponse)
 ```
 
-Aunque el modelo tenga `hashed_password`, si `UsuarioResponse` no lo incluye, **nunca se envía al usuario**. Actúa como un filtro de seguridad.
+Aunque el modelo tenga `hashed_password`, si `UsuarioResponse` no lo incluye, **nunca se envía al cliente**. Es un filtro de seguridad automático.
 
 ---
 
@@ -671,127 +589,36 @@ Aunque el modelo tenga `hashed_password`, si `UsuarioResponse` no lo incluye, **
 
 Las funciones CRUD viven en `crud/` y son las únicas que interactúan directamente con la BD. Los endpoints **nunca** tocan la BD directamente.
 
-### CRUD de Producto (`crud/producto.py`)
-
-```python
-from sqlalchemy.orm import Session
-from schemas import ProductoCreate
-from models import Producto
-
-def obtener_productos(db: Session):
-    return db.query(Producto).all()
-
-def crear_producto(db: Session, producto: ProductoCreate):
-    nuevo = Producto(
-        nombre=producto.nombre,
-        precio=producto.precio,
-        en_stock=producto.en_stock,
-        categoria_id=producto.categoria_id
-    )
-    db.add(nuevo)       # Pone en "sala de espera"
-    db.commit()         # Ejecuta el INSERT real
-    db.refresh(nuevo)   # Obtiene el id auto-generado
-    return nuevo
-
-def actualizar_producto(db: Session, producto_id: int, datos: ProductoCreate):
-    producto = db.query(Producto).filter(Producto.id == producto_id).first()
-    if not producto:
-        return None
-    producto.nombre = datos.nombre
-    producto.precio = datos.precio
-    producto.en_stock = datos.en_stock
-    producto.categoria_id = datos.categoria_id
-    db.commit()
-    db.refresh(producto)
-    return producto
-
-def eliminar_producto(db: Session, producto_id: int):
-    producto = db.query(Producto).filter(Producto.id == producto_id).first()
-    if not producto:
-        return None
-    db.delete(producto)
-    db.commit()
-    return producto
-```
-
-### CRUD de Categoría (`crud/categoria.py`)
-
-```python
-def crear_categoria(db: Session, categoria: CategoriaCreate):
-    db_categoria = Categoria(nombre=categoria.nombre)
-    db.add(db_categoria)
-    db.commit()
-    db.refresh(db_categoria)
-    return db_categoria
-
-def obtener_categorias(db: Session):
-    return db.query(Categoria).all()
-```
-
-### CRUD de Usuario (`crud/usuario.py`)
-
-```python
-from sqlalchemy import or_
-from core.security import hash_password
-
-def obtener_usuario_por_email(db: Session, email: str):
-    return db.query(Usuario).filter(Usuario.email == email).first()
-
-def obtener_usuario_por_id(db: Session, usuario_id: int):
-    return db.query(Usuario).filter(Usuario.id == usuario_id).first()
-
-def crear_usuario(db: Session, usuario: UsuarioCreate):
-    # Verifica que no exista duplicado por email O por nombre
-    existe = db.query(Usuario).filter(
-        or_(
-            Usuario.email == usuario.email,
-            Usuario.nombre == usuario.nombre
-        )
-    ).first()
-    if existe:
-        raise ValueError("Ya existe un usuario con ese email o nombre")
-
-    db_usuario = Usuario(
-        nombre=usuario.nombre,
-        email=usuario.email,
-        hashed_password=hash_password(usuario.password),  # Se hashea aquí
-        es_admin=usuario.es_admin
-    )
-    db.add(db_usuario)
-    db.commit()
-    db.refresh(db_usuario)
-    return db_usuario
-```
-
-> 💡 `or_()` genera un `WHERE ... OR ...` en SQL. Sin él, `.filter()` combina condiciones con `AND`.
-
 ### Referencia rápida: ORM vs SQL
 
-| Operación       | ORM (Python)                                      | SQL equivalente                      |
-|-----------------|---------------------------------------------------|--------------------------------------|
-| Listar todos    | `db.query(Producto).all()`                        | `SELECT * FROM productos`            |
-| Buscar por ID   | `db.query(Producto).filter(Producto.id == 1).first()` | `SELECT * FROM productos WHERE id=1 LIMIT 1` |
-| Insertar        | `db.add(nuevo)` + `db.commit()`                   | `INSERT INTO productos (...) VALUES (...)` |
-| Actualizar      | Modificar atributos + `db.commit()`               | `UPDATE productos SET ... WHERE id=?` |
-| Eliminar        | `db.delete(obj)` + `db.commit()`                  | `DELETE FROM productos WHERE id=?`   |
+| Operación       | ORM (Python)                                        | SQL equivalente                        |
+|-----------------|-----------------------------------------------------|----------------------------------------|
+| Listar todos    | `db.query(Producto).all()`                          | `SELECT * FROM productos`              |
+| Buscar por ID   | `db.get(Producto, 1)`                               | `SELECT * FROM productos WHERE id=1`   |
+| Filtrar         | `db.query(Producto).filter_by(en_stock=True).all()` | `SELECT * FROM productos WHERE ...`    |
+| Insertar        | `db.add(nuevo)` + `db.commit()`                     | `INSERT INTO productos (...) VALUES (...)` |
+| Actualizar      | Modificar atributos + `db.commit()`                 | `UPDATE productos SET ... WHERE id=?`  |
+| Eliminar        | `db.delete(obj)` + `db.commit()`                    | `DELETE FROM productos WHERE id=?`     |
 
-### Re-exportación con `__init__.py`
+### `filter` vs `filter_by`
 
-`crud/__init__.py` permite importar todas las funciones directamente:
+SQLAlchemy ofrece dos formas de filtrar:
 
 ```python
-from .categoria import *
-from .producto import *
-from .usuario import *
+# filter → para condiciones complejas (comparaciones, OR, LIKE, etc.)
+db.query(Producto).filter(Producto.precio > 100).all()
+db.query(Producto).filter(Producto.id == 1, Producto.en_stock == True).first()
+
+# filter_by → para igualdades simples (más legible)
+db.query(ItemCarrito).filter_by(carrito_id=1, producto_id=5).first()
+# Equivale a: WHERE carrito_id = 1 AND producto_id = 5
 ```
 
-Así puedes hacer `import crud` y luego `crud.crear_producto(...)`.
+> ⚠️ Con `filter`, **debes** usar el prefijo del modelo (`Producto.precio`). Sin él, estás comparando variables de Python entre sí, no columnas de la BD.
 
 ---
 
 ## 🔐 Seguridad y Autenticación
-
-Todo el sistema de seguridad vive en `core/security.py`. Las claves sensibles se cargan desde variables de entorno.
 
 ### Hashing de contraseñas (bcrypt)
 
@@ -800,65 +627,52 @@ from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def hash_password(password: str):
+def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
-def verify_password(password: str, hashed: str):
+def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password, hashed)
 ```
 
-| Función               | ¿Cuándo se usa?              | Ejemplo                                   |
-|-----------------------|------------------------------|-------------------------------------------|
-| `hash_password()`     | Al **registrar** un usuario  | `"MiClave123"` → `"$2b$12$xKj8fG..."`    |
-| `verify_password()`   | Al hacer **login**           | Compara contraseña ingresada vs hash guardado |
+| Función               | ¿Cuándo se usa?              |
+|-----------------------|------------------------------|
+| `hash_password()`     | Al **registrar** un usuario  |
+| `verify_password()`   | Al hacer **login**           |
 
-> ⚠️ `verify_password` **no desencripta** el hash. Hashea la contraseña ingresada y compara los resultados. El hash es **irreversible**.
+> ⚠️ `verify_password` **no desencripta** el hash. Hashea la contraseña ingresada y compara. El hash es **irreversible**.
 
 ### Tokens JWT
 
 ```python
-from jose import JWTError, jwt
-from datetime import datetime, timedelta, timezone
-from core.config import settings
-
-SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = settings.ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
-
-def crear_token(sub: str, es_admin: bool):
+def crear_token(sub: str, es_admin: bool) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     data = {"sub": sub, "exp": expire, "es_admin": es_admin}
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
 
 def verificar_token(token: str):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         return None
 ```
 
-| Función             | ¿Cuándo se usa?               | Resultado                                  |
-|---------------------|-------------------------------|---------------------------------------------|
-| `crear_token()`     | Después de un login exitoso   | Genera un token JWT firmado                 |
-| `verificar_token()` | En cada petición protegida    | Devuelve el payload o `None` si es inválido |
-
-Un JWT tiene 3 partes: **Header** (algoritmo), **Payload** (datos + expiración) y **Firma** (verificación).
+Un JWT tiene 3 partes: **Header** (algoritmo) · **Payload** (datos + expiración) · **Firma** (verificación).
 
 ### Flujo completo de autenticación
 
 ```
-1. REGISTRO  →  hash_password(password)  →  Se guarda hash en BD
-2. LOGIN     →  verify_password(password, hash_guardado)
-              →  Si coincide: crear_token(email, es_admin)  →  Devuelve token
-3. RUTA PROTEGIDA  →  verificar_token(token)  →  Si válido: permite acceso
+1. REGISTRO   → hash_password(password) → Se guarda hash en BD (nunca el texto plano)
+2. LOGIN      → verify_password(password, hash_guardado)
+               → Si coincide: crear_token(email, es_admin) → Devuelve token JWT
+3. PETICIÓN   → El cliente envía: Authorization: Bearer <token>
+4. VALIDACIÓN → get_current_user() llama verificar_token() → Si válido: devuelve el usuario
 ```
 
 ---
 
 ## 🗂 Sistema de Rutas con APIRouter
 
-`APIRouter` permite dividir los endpoints en **múltiples archivos organizados por funcionalidad**, en vez de poner todo en `main.py`.
+`APIRouter` permite dividir los endpoints en **múltiples archivos organizados por funcionalidad**.
 
 ### Punto de entrada (`main.py`)
 
@@ -867,83 +681,60 @@ from fastapi import FastAPI
 from api.api_v1.api import api_router
 
 app = FastAPI()
-app.include_router(api_router, prefix="api/v1")
+app.include_router(api_router, prefix="/api/v1")
 ```
 
 ### Router principal (`api/api_v1/api.py`)
 
-Agrupa todos los sub-routers bajo un mismo router:
-
 ```python
-from fastapi import APIRouter
-from api.api_v1 import auth, productos, categorias
-
 api_router = APIRouter()
-
-api_router.include_router(router=auth.api_router, prefix="/auth", tags=["auth"])
-api_router.include_router(router=productos.api_router, prefix="/productos", tags=["productos"])
-api_router.include_router(router=categorias.api_router, prefix="/categorias", tags=["categorias"])
+api_router.include_router(auth.api_router,      prefix="/auth",      tags=["auth"])
+api_router.include_router(productos.api_router,  prefix="/productos",  tags=["productos"])
+api_router.include_router(categorias.api_router, prefix="/categorias", tags=["categorias"])
+api_router.include_router(carrito.api_router,    prefix="/carrito",    tags=["carritos"])
+api_router.include_router(pedido.api_router,     prefix="/pedido",     tags=["pedidos"])
 ```
 
-### Cómo se construyen las URLs finales
-
-El prefijo de `main.py` + el prefijo de `api.py` + la ruta del endpoint:
+### Cómo se construyen las URLs
 
 ```
-main.py prefix    api.py prefix     endpoint path     URL final
-"api/v1"       + "/auth"         + "/login"         = api/v1/auth/login
-"api/v1"       + "/productos"    + "/productos"     = api/v1/productos/productos
-"api/v1"       + "/categorias"   + "/categorias"    = api/v1/categorias/categorias
+main.py prefix  +  api.py prefix  +  endpoint path  =  URL final
+"/api/v1"       +  "/auth"        +  "/login"        =  /api/v1/auth/login
+"/api/v1"       +  "/carrito"     +  "/agregar/3"    =  /api/v1/carrito/agregar/3
 ```
-
-Los **tags** agrupan visualmente los endpoints en la documentación Swagger.
 
 ---
 
 ## 🔗 Dependencias
 
-Las dependencias viven en `deps/deps.py`. Se inyectan con `Depends()` en los endpoints.
+Las dependencias viven en `deps/deps.py` y se inyectan con `Depends()` en los endpoints.
 
 ### Sesión de Base de Datos (`get_db`)
 
 ```python
-from db.database import SessionLocal
-
 def get_db():
     db = SessionLocal()
     try:
-        yield db
+        yield db       # ← FastAPI inyecta la sesión en el endpoint
     finally:
-        db.close()
+        db.close()     # ← Se ejecuta SIEMPRE, aunque ocurra un error
 ```
 
-`yield` (en vez de `return`) garantiza que la conexión se cierre **siempre**, incluso si hay errores.
+`yield` garantiza que la conexión se cierre **siempre**, incluso si hay excepciones.
 
 ### Autenticación (`get_current_user`)
 
 ```python
-from fastapi.security import OAuth2PasswordBearer
-from core.security import verificar_token
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    cred_exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="No autenticado",
-        headers={"WWW-Authenticate": "Bearer"}
-    )
-    try:
-        payload = verificar_token(token)
-        email = payload.get("sub")
-        if email is None:
-            raise cred_exc
-    except JWTError:
-        raise cred_exc
-
+    payload = verificar_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="No autenticado")
+    email = payload.get("sub")
     user = crud.obtener_usuario_por_email(db, email)
     if user is None:
-        raise cred_exc
+        raise HTTPException(status_code=401, detail="No autenticado")
     return user
 ```
 
@@ -957,38 +748,228 @@ def requiere_admin(current_user = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="No autorizado, requiere admin")
 ```
 
-Se usa como dependencia para endpoints que solo admins pueden ejecutar.
+---
+
+## 🗃 Migraciones con Alembic
+
+### ¿Por qué Alembic?
+
+`Base.metadata.create_all()` solo crea tablas que **no existen**. Si agregas una columna nueva a un modelo, **no modifica la tabla existente**. Alembic detecta los cambios y genera scripts SQL para aplicarlos sin perder datos.
+
+### Configuración inicial
+
+```bash
+cd app
+alembic init alembic
+```
+
+Esto crea la carpeta `alembic/` con `env.py` y `alembic.ini`. El archivo `env.py` debe configurarse para apuntar a la BD y a los modelos:
+
+```python
+# En alembic/env.py
+from core.config import settings
+from db.database import Base
+from models import *  # Importar todos los modelos para que Alembic los detecte
+
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+target_metadata = Base.metadata
+```
+
+### Flujo de trabajo de Alembic
+
+```bash
+# 1. Detecta cambios en los modelos y genera un script de migración
+alembic revision --autogenerate -m "descripcion del cambio"
+
+# 2. Aplica todas las migraciones pendientes
+alembic upgrade head
+
+# 3. Ver el estado actual
+alembic current
+
+# 4. Ver historial de migraciones
+alembic history
+```
+
+### ¿Cuándo se necesita una migración?
+
+| Cambio                              | ¿Requiere migración? |
+|-------------------------------------|----------------------|
+| Agregar una columna nueva           | ✅ Sí               |
+| Cambiar el tipo de una columna      | ✅ Sí               |
+| Agregar una nueva tabla             | ✅ Sí               |
+| Agregar/modificar un `relationship` | ❌ No (es ORM, no BD) |
+| Cambiar el nombre de un `relationship` | ❌ No            |
+
+> 💡 Los `relationship` de SQLAlchemy son **solo Python**: no generan columnas ni tablas en la BD. Por eso Alembic no los detecta y las migraciones de solo-relaciones quedan vacías (`pass`).
+
+---
+
+## 🛒 Sistema de Carrito de Compras
+
+El carrito es una entidad **temporal** que almacena los productos que el usuario quiere comprar antes de confirmar el pedido.
+
+### Flujo del carrito
+
+```
+1. obtener_carrito(usuario_id) → Si no existe, se crea automáticamente
+2. agregar_item(carrito_id, producto_id, cantidad)
+   - Si el producto ya está en el carrito → suma la cantidad
+   - Si no está → crea un nuevo ItemCarrito
+3. eliminar_item(item_id) → Borra un producto específico del carrito
+```
+
+### CRUD del carrito (`crud/carrito.py`)
+
+```python
+def obtener_carrito(db: Session, usuario_id: int):
+    carrito = db.query(Carrito).filter(Carrito.usuario_id == usuario_id).first()
+    if not carrito:
+        carrito = Carrito(usuario_id=usuario_id)
+        db.add(carrito)
+        db.commit()
+        db.refresh(carrito)
+    return carrito
+
+def agregar_item(db: Session, carrito_id: int, producto_id: int, cantidad: int = 1):
+    item = db.query(ItemCarrito).filter_by(carrito_id=carrito_id, producto_id=producto_id).first()
+    if item:
+        item.cantidad += cantidad   # Ya existe → solo suma
+    else:
+        item = ItemCarrito(carrito_id=carrito_id, producto_id=producto_id, cantidad=cantidad)
+        db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+```
+
+### ¿Cómo sabe el sistema de qué usuario es el carrito?
+
+El endpoint de carrito usa `Depends(get_current_user)`. FastAPI decodifica el JWT del header `Authorization` y devuelve el objeto `usuario`. Con `user.id` se busca el carrito:
+
+```python
+@api_router.get("/")
+def ver_carrito(db = Depends(get_db), user = Depends(get_current_user)):
+    return crud_carrito.obtener_carrito(db, user.id)
+```
+
+---
+
+## 📦 Sistema de Pedidos
+
+El pedido es el **registro permanente** de una compra. Se crea a partir del carrito y no desaparece cuando el carrito se vacía.
+
+### Diferencia entre Carrito y Pedido
+
+| Aspecto      | Carrito (`carritos` + `items_carrito`) | Pedido (`pedidos` + `detalles_pedidos`) |
+|-------------|----------------------------------------|-----------------------------------------|
+| **Duración** | Temporal — desaparece al confirmar     | Permanente — historial de compras       |
+| **Contenido**| Items que el usuario *quiere* comprar  | Items que el usuario *compró*           |
+| **Referencia**| Apunta a `productos` (directo)        | Apunta a `productos` (directo)          |
+| **Total**    | No tiene total                         | Tiene total calculado                   |
+
+> 💡 Tanto `items_carrito` como `detalles_pedidos` apuntan directamente a `productos` (no el uno al otro). Esto es correcto: los detalles del pedido son un registro histórico independiente del carrito. Si el carrito se borrara y los detalles apuntaran a `items_carrito`, se borrría el historial del pedido.
+
+### Lógica de confirmación de pedido (`crud/pedido.py`)
+
+```python
+def crear_pedido(db: Session, usuario_id: int):
+    carrito = db.query(Carrito).filter_by(usuario_id=usuario_id).first()
+
+    if not carrito or not carrito.items:
+        raise ValueError("El carrito esta vacio")
+
+    total = 0
+    pedido = Pedido(usuario_id=usuario_id, total=0)
+    db.add(pedido)
+    db.commit()
+    db.refresh(pedido)  # Necesario para obtener el id generado
+
+    for item in carrito.items:
+        producto = db.get(Producto, item.producto_id)
+
+        if not producto.stock or producto.precio <= 0:
+            continue  # Saltar productos sin stock o precio inválido
+
+        if 0 < item.cantidad <= producto.stock:
+            subtotal = producto.precio * item.cantidad
+            producto.stock -= item.cantidad  # Descontar del inventario
+            detalle = DetallePedido(
+                pedido_id=pedido.id,
+                producto_id=producto.id,
+                cantidad=item.cantidad,
+                subtotal=subtotal
+            )
+            db.add(detalle)
+            total += subtotal
+
+    pedido.total = total
+    db.commit()
+
+    # Limpiar el carrito tras la compra
+    for item in carrito.items:
+        db.delete(item)
+    db.delete(carrito)
+    db.commit()
+
+    return pedido
+```
+
+### Flujo completo del e-commerce
+
+```
+1. POST /auth/registro        → Crear usuario
+2. POST /auth/login           → Obtener JWT token
+3. POST /carrito/agregar/{id} → Agregar producto al carrito (requiere token)
+4. GET  /carrito/             → Ver contenido del carrito (requiere token)
+5. POST /pedido/confirmar     → Convertir carrito en pedido (requiere token)
+                                → Stock se descuenta, carrito se elimina
+```
 
 ---
 
 ## 🌐 Endpoints de la API
 
-### Auth (`api/api_v1/auth.py`)
+> Todas las rutas llevan el prefijo `/api/v1/` definido en `main.py`.
 
-| Método | Ruta                       | Descripción                    | Protegido         |
-|--------|----------------------------|--------------------------------|-------------------|
-| POST   | `/auth/usuarios`           | Registrar un nuevo usuario     | No                |
-| POST   | `/auth/login`              | Login (devuelve JWT)           | No                |
-| GET    | `/auth/usuarios/me`        | Ver perfil del usuario actual  | Sí (token)        |
-| GET    | `/auth/admin/ping`         | Verificar permisos de admin    | Sí (solo admins)  |
+### Auth
 
-### Productos (`api/api_v1/productos.py`)
+| Método | Ruta                 | Descripción                    | Protegido         |
+|--------|----------------------|--------------------------------|-------------------|
+| POST   | `/auth/usuarios`     | Registrar un nuevo usuario     | No                |
+| POST   | `/auth/login`        | Login (devuelve JWT)           | No                |
+| GET    | `/auth/usuarios/me`  | Ver perfil del usuario actual  | Sí (token)        |
+| GET    | `/auth/admin/ping`   | Verificar permisos de admin    | Sí (solo admins)  |
 
-| Método | Ruta                       | Descripción                    | Protegido         |
-|--------|----------------------------|--------------------------------|-------------------|
-| GET    | `/productos/productos`     | Listar todos los productos     | No                |
-| POST   | `/productos/productos`     | Crear un producto              | Sí (solo admins)  |
-| PUT    | `/productos/productos/{id}`| Actualizar un producto         | No                |
-| DELETE | `/productos/productos/{id}`| Eliminar un producto           | No                |
+### Productos
 
-### Categorías (`api/api_v1/categorias.py`)
+| Método | Ruta                   | Descripción                    | Protegido         |
+|--------|------------------------|--------------------------------|-------------------|
+| GET    | `/productos/`          | Listar todos los productos     | No                |
+| POST   | `/productos/`          | Crear un producto              | Sí (solo admins)  |
+| PUT    | `/productos/{id}`      | Actualizar un producto         | Sí (solo admins)  |
+| DELETE | `/productos/{id}`      | Eliminar un producto           | Sí (solo admins)  |
 
-| Método | Ruta                           | Descripción                  | Protegido |
-|--------|--------------------------------|------------------------------|-----------|
-| POST   | `/categorias/categorias`       | Crear una categoría          | No        |
-| GET    | `/categorias/categorias`       | Listar todas las categorías  | No        |
+### Categorías
 
-> 📝 Todas las rutas llevan el prefijo `api/v1/` definido en `main.py`.
+| Método | Ruta              | Descripción                  | Protegido |
+|--------|-------------------|------------------------------|-----------|
+| POST   | `/categorias/`    | Crear una categoría          | No        |
+| GET    | `/categorias/`    | Listar todas las categorías  | No        |
+
+### Carrito
+
+| Método | Ruta                       | Descripción                              | Protegido |
+|--------|----------------------------|------------------------------------------|-----------|
+| GET    | `/carrito/`                | Ver carrito del usuario autenticado      | Sí        |
+| POST   | `/carrito/agregar/{id}`    | Agregar un producto al carrito           | Sí        |
+| DELETE | `/carrito/eliminar/{id}`   | Eliminar un item del carrito             | Sí        |
+
+### Pedidos
+
+| Método | Ruta                | Descripción                                         | Protegido |
+|--------|---------------------|-----------------------------------------------------|-----------|
+| POST   | `/pedido/confirmar` | Confirmar la compra → convierte el carrito en pedido | Sí        |
 
 ---
 
@@ -997,22 +978,9 @@ Se usa como dependencia para endpoints que solo admins pueden ejecutar.
 | Recurso                            | Enlace                                                                          |
 |------------------------------------|---------------------------------------------------------------------------------|
 | Documentación oficial de FastAPI   | [fastapi.tiangolo.com](https://fastapi.tiangolo.com)                            |
-| Tutorial interactivo de FastAPI    | [fastapi.tiangolo.com/tutorial](https://fastapi.tiangolo.com/tutorial/)         |
 | FastAPI + SQL Databases            | [fastapi.tiangolo.com/tutorial/sql-databases](https://fastapi.tiangolo.com/tutorial/sql-databases/) |
 | Documentación de Pydantic          | [docs.pydantic.dev](https://docs.pydantic.dev/)                                |
 | Documentación de SQLAlchemy        | [docs.sqlalchemy.org](https://docs.sqlalchemy.org/)                             |
-| Documentación de Uvicorn           | [uvicorn.org](https://www.uvicorn.org/)                                         |
+| Documentación de Alembic           | [alembic.sqlalchemy.org](https://alembic.sqlalchemy.org/)                       |
 | Documentación de python-jose (JWT) | [python-jose.readthedocs.io](https://python-jose.readthedocs.io/)              |
 | Documentación de passlib           | [passlib.readthedocs.io](https://passlib.readthedocs.io/)                      |
-
----
-
-> 🚧 *Este README se actualizará a medida que avance el proyecto.*
-
-
-MIGRACIONES, EVITAR PERDER DATOS AL AGREGAR UNA NUEVA COLUMNA, USAREMOS, alembic init alembic Contiene los scripts de migracion
-alembic revision --autogenerate -m "crear tablas iniciales" HACE EL CAMBIO
-
-Mas entidades, el modelo del pedido, se tendra un carrito, donde el usuario podra confirmar la compra, el carrito puede cambiar muchas veces pero el pedido es permanente
-
-Si la base de dato tiene migraciones pendientes etnonces se usa upgrade head
