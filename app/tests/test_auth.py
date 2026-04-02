@@ -14,7 +14,7 @@ def test_login_invalido():
         "/api/v1/auth/login",
         data={
             "username":"admin@gmail.com",
-            "password":"123"
+            "password":"1234"
         })
     assert response.status_code == 401
 
